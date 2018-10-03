@@ -86,4 +86,28 @@ fi
 
 # Ket thuc phan set cho DENY_HOST, DENY HOST end
 
+# Trao doi packet sao khi viec khoi tao session duoc cho phep
+# Packet communication after session establishment is permitted
+
+iptables -A INPUT  -p tcp -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+# Chong lai steath scan - steath scan attack measures
+
+iptables -N STEALTH_SCAN # Tao moi chain "STEAlTH_SCAN" - make a chain
+iptables -A STEALTH_SCAN -j LOG --log-prefix "stealth_scan_attack: "
+iptables -A STEALTH_SCAN -j DROP
+# Chuyen qua chain "STEALTH_SCAN" cho nhung packet da duoc stealth scan
+# Jump to the "STEALTH_SCAN" chain for stealth scanned packets
+iptables -A INPUT -p tcp --tcp-flags SYN,ACK SYN,ACK -m state --state NEW -j STEALTH_SCAN
+
+iptables -A INPUT -p tcp --tcp-flags SYN,FIN SYN,FIN         -j STEALTH_SCAN
+iptables -A INPUT -p tcp --tcp-flags SYN,RST SYN,RST         -j STEALTH_SCAN
+iptables -A INPUT -p tcp --tcp-flags ALL SYN,RST,ACK,FIN,URG -j STEALTH_SCAN
+
+iptables -A INPUT -p tcp --tcp-flags FIN,RST FIN,RST -j STEALTH_SCAN
+iptables -A INPUT -p tcp --tcp-flags ACK,FIN FIN     -j STEALTH_SCAN
+iptables -A INPUT -p tcp --tcp-flags ACK,PSH PSH     -j STEALTH_SCAN
+iptables -A INPUT -p tcp --tcp-flags ACK,URG URG     -j STEALTH_SCAN
+
+
 

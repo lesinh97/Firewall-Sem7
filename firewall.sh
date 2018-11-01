@@ -1,8 +1,8 @@
 #!/bin/bash
-# Khai bao PATH - Path declare
+# Khai báo PATH - Path declare
 PATH=/sbin:/usr/sbin:/bin:/usr/bins
 #####################################
-# Khai bao cac service port, neu khong khai bao thi dung so port - Port declare
+# Khai báo các service port, mục đích làm script dễ đọc thôi - Port declare
 SSH=22
 FTP=20,21
 DNS=53
@@ -86,12 +86,12 @@ fi
 
 # Ket thuc phan set cho DENY_HOST, DENY HOST end
 
-# Trao doi packet sao khi viec khoi tao session duoc cho phep
+# Trao doi packet duoc cho phep sau khi viec khoi tao session thanh cong
 # Packet communication after session establishment is permitted
 
 iptables -A INPUT  -p tcp -m state --state ESTABLISHED,RELATED -j ACCEPT
-
-# Chong lai steath scan - steath scan attack measures
+########################################################################
+# Chong lai steath scan - steath scan attack measures -nmap
 
 iptables -N STEALTH_SCAN # Tao moi chain "STEAlTH_SCAN" - make a chain
 iptables -A STEALTH_SCAN -j LOG --log-prefix "stealth_scan_attack: "
@@ -108,6 +108,25 @@ iptables -A INPUT -p tcp --tcp-flags FIN,RST FIN,RST -j STEALTH_SCAN
 iptables -A INPUT -p tcp --tcp-flags ACK,FIN FIN     -j STEALTH_SCAN
 iptables -A INPUT -p tcp --tcp-flags ACK,PSH PSH     -j STEALTH_SCAN
 iptables -A INPUT -p tcp --tcp-flags ACK,URG URG     -j STEALTH_SCAN
+#########################################################################
+# Chong lai ping of death
+# Thuat toan la cu tu choi dich vao co hon 1ping/s
+# Discard if more than 1 ping per second lasts ten times
+iptables -N PING_OF_DEATH # Make chain with the name "PING_OF_DEATH"
+iptables -A PING_OF_DEATH -p icmp --icmp-type echo-request \
+         -m hashlimit \
+         --hashlimit 1/s \
+         --hashlimit-burst 10 \
+         --hashlimit-htable-expire 300000 \
+         --hashlimit-mode srcip \
+         --hashlimit-name t_PING_OF_DEATH \
+         -j RETURN
 
+# Doc cheat sheet o README.md
+# Tu choi nhung ICMP vuot qua gioi han
+iptables -A PING_OF_DEATH -j LOG --log-prefix "ping_of_death_attack: "
+iptables -A PING_OF_DEATH -j DROP
 
+# Nhay den chain POD
+iptables -A INPUT -p icmp --icmp-type echo-request -j PING_OF_DEATH
 

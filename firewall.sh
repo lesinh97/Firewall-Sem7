@@ -28,7 +28,7 @@ inintialize() {
 # ham final thuc thi sau khi cac quy tac duoc thiet lap - Process after rule application
 finalize()
 {
-  /etc/init.d/iptables save && # Luu setting vao thu muc config cuar iptables
+  /etc/init.d/iptables save && # Luu setting vao thu muc config cua iptables
   /etc/init.d/iptables restart && # Khoi dong lai iptables
   return 0
   return 1
@@ -129,4 +129,51 @@ iptables -A PING_OF_DEATH -j DROP
 
 # Nhay den chain POD
 iptables -A INPUT -p icmp --icmp-type echo-request -j PING_OF_DEATH
+
+#########################################################################
+# Chong lai SYN FLOOD - Counter SYN FLOOD
+# Nen bat SYN Cookie - Should turn on SYN cookie in addtion.
+iptables -N SYN_FLOOD # Make chain with the name "SYN_FLOOD"
+iptables -A SYN_FLOOD -p tcp --syn \
+         -m hashlimit \
+         --hashlimit 200/s \
+         --hashlimit-burst 3 \
+         --hashlimit-htable-expire 300000 \
+         --hashlimit-mode srcip \
+         --hashlimit-name t_SYN_FLOOD \
+         -j RETURN
+
+# Huy cac goi SYN vuot qua gioi han
+# Discard SYN packet exceeding limit
+iptables -A SYN_FLOOD -j LOG --log-prefix "syn_flood_attack: "
+iptables -A SYN_FLOOD -j DROP
+
+# Nhay den chain SYN_FLOOD
+# SYN packet jumps to "SYN_FLOOD" chain
+iptables -A INPUT -p tcp --syn -j SYN_FLOOD
+
+#########################################################################
+# Chong lai HTTP/Dos - DDos
+# Counter HTTP/Dos - DDos
+ptables -N HTTP_DOS # Make chain with the name "HTTP_DOS"
+iptables -A HTTP_DOS -p tcp -m multiport --dports $HTTP \
+         -m hashlimit \
+         --hashlimit 1/s \
+         --hashlimit-burst 100 \
+         --hashlimit-htable-expire 300000 \
+         --hashlimit-mode srcip \
+         --hashlimit-name t_HTTP_DOS \
+         -j RETURN
+
+# Huy ket noi vuot qua gioi han
+# Discard connection exceeding limit
+iptables -A HTTP_DOS -j LOG --log-prefix "http_dos_attack: "
+iptables -A HTTP_DOS -j DROP
+
+# Nhay den chain HTTP_DOS
+# Packets to HTTP jump to "HTTP_DOS" chain
+iptables -A INPUT -p tcp -m multiport --dports $HTTP -j HTTP_DOS
+
+
+
 

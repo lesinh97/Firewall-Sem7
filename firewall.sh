@@ -174,6 +174,38 @@ iptables -A HTTP_DOS -j DROP
 # Packets to HTTP jump to "HTTP_DOS" chain
 iptables -A INPUT -p tcp -m multiport --dports $HTTP -j HTTP_DOS
 
+###########################################################
+# Counter: IDENT port probe
+# Use ident to allow an attacker to prepare for future attacks,
+# Perform a port survey to see if the system is vulnerable
+# As DROP reduces responses of mail servers etc REJECT
+###########################################################
+iptables -A INPUT -p tcp -m multiport --dports $IDENT -j REJECT --reject-with tcp-reset
+
+###########################################################
+# Allow input from specific host
+###########################################################
+
+###########################################################
+# Other than that
+# Those which also did not apply to the above rule logging and discarding
+###########################################################
+iptables -A INPUT  -j LOG --log-prefix "drop: "
+iptables -A INPUT  -j DROP
+
+###########################################################
+# SSH lockout workaround
+# Sleep for 30 seconds and then reset iptables.
+# If SSH is not locked out, you should be able to press Ctrl - C.
+###########################################################
+trap 'finailize && exit 0' 2 # Ctrl - C if you want
+echo "In 30 seconds iptables will be automatically reset."
+echo "Don't forget to test new SSH connection!"
+echo "If there is no problem then press Ctrl-C to finish."
+sleep 30
+echo "rollback..."
+initialize
+
 
 
 

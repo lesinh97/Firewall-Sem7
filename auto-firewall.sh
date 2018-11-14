@@ -2,19 +2,15 @@
 iptables="/sbin/iptables"
 ext_if=$(/sbin/ip route | grep default | awk '{print $5}') # external interface
 
-network_addr=$(/sbin/ip route | grep default | awk '{print $3}' | cut -d"." -f1-3)
+network_addr=$(/sbin/ip route | grep default | awk '{print $3}' | cut -d"." -f1-3) # Tach phan host ra
 broadcast_addr="$network_addr.255"
 
 # declare some options to choose
 lan_allow="1" # this will set allow all connection from LAN
 blacklist_block="1" # enable block ips from blacklist
 whitelist_allow="1" # enable allow ips from whitelist
-gateway="1" # make this server as gateway
 
-# if gateway, list internal interfaces
-if [ "$gateway" = "1" ]; then
-	int_if=$(/sbin/ip link show | grep "state UP" | grep -v $ext_if | awk '{print $2}' | cut -d':' -f1)
-fi
+
 
 # WARNING: edit carefully
 # list incoming and outgoing TCP & UDP ports (ssh incoming is mandatory, not list here)

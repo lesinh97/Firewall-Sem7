@@ -1,0 +1,21 @@
+###########################################################
+# 攻撃対策: SSH Brute Force
+# In the case of a server using password authentication, SSH prepares for a password full attack.
+# Try to make a connection try only five times per minute.
+# In order to prevent the SSH client side from repeating reconnection, make REJECT instead of DROP.
+# If the SSH server is password-on authentication, uncomment out the following
+###########################################################
+# iptables -A INPUT -p tcp --syn -m multiport --dports $SSH -m recent --name ssh_attack --set
+# iptables -A INPUT -p tcp --syn -m multiport --dports $SSH -m recent --name ssh_attack --rcheck --seconds 60 --hitcount 5 -j LOG --log-prefix "ssh_brute_force: "
+# iptables -A INPUT -p tcp --syn -m multiport --dports $SSH -m recent --name ssh_attack --rcheck --seconds 60 --hitcount 5 -j REJECT --reject-with tcp-reset
+
+###########################################################
+# 攻撃対策: FTP Brute Force
+# FTP prepares for password full attacks for password authentication.
+# Try to make a connection try only five times per minute.
+# In order to prevent the FTP client side from repeating reconnection, make REJECT instead of DROP.
+# When starting FTP server, un-comment out the following
+###########################################################
+# iptables -A INPUT -p tcp --syn -m multiport --dports $FTP -m recent --name ftp_attack --set
+# iptables -A INPUT -p tcp --syn -m multiport --dports $FTP -m recent --name ftp_attack --rcheck --seconds 60 --hitcount 5 -j LOG --log-prefix "ftp_brute_force: "
+# iptables -A INPUT -p tcp --syn -m multiport --dports $FTP -m recent --name ftp_attack --rcheck --seconds 60 --hitcount 5 -j REJECT --reject-with tcp-reset

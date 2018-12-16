@@ -1,19 +1,17 @@
 # declare some system variables
 iptables="/sbin/iptables"
-ext_if=$(/sbin/ip route | grep default | awk '{print $5}') # external interface
+ext_if=$(/sbin/ip route | grep default | awk '{print $5}') # giao dien mang
 
-network_addr=$(/sbin/ip route | grep default | awk '{print $3}' | cut -d"." -f1-3) # Tach phan host ra
-broadcast_addr="$network_addr.255"
+network_addr=$(/sbin/ip route | grep default | awk '{print $3}' | cut -d"." -f1-3) # Tach phan host ID ra
+broadcast_addr="$network_addr.255" # dia chi broadcast
 
-# declare some options to choose
-lan_allow="1" # this will set allow all connection from LAN
-blacklist_block="1" # enable block ips from blacklist
-whitelist_allow="1" # enable allow ips from whitelist
+# Mot so option
+lan_allow="1" # Chap nhan moi connection tu LAN
+blacklist_block="1" # Block moi ip trong file blacklist
+whitelist_allow="1" # Allow moi ip trong file whitelist
 
 
-
-# WARNING: edit carefully
-# list incoming and outgoing TCP & UDP ports (ssh incoming is mandatory, not list here)
+# Cac cong ra vao cua UDP va TCP, ket noi SSH la bat buoc nen khong can khai bao o day
 # ------------------------------------------------------------------------------------
 incoming_tcp="80,443"            # allow incoming tcp request
 incoming_udp=""                  # allow incoming udp request
@@ -36,7 +34,7 @@ case "$1" in
 		stop_firewall="1"
         ;;
     *) 
-        echo $"Usage: filewall.sh {start|stop}"
+        echo $"Chay day du cau lenh: filewall.sh {start|stop}"
         exit 2
 esac
 
@@ -53,18 +51,20 @@ fi
 
 ### Start
 # tuning network protection
-echo 1 > /proc/sys/net/ipv4/tcp_syncookies                          # enable TCP SYN cookie protection
+echo 1 > /proc/sys/net/ipv4/tcp_syncookies                          # enable TCP SYN cookie protection for youngbuffalo DoS - 
 echo 0 > /proc/sys/net/ipv4/conf/all/accept_source_route            # disable IP Source routing
 echo 0 > /proc/sys/net/ipv4/conf/all/accept_redirects               # disable ICMP Redirect acceptance
 echo 1 > /proc/sys/net/ipv4/conf/all/rp_filter                      # enable IP spoofing protection
 echo 1 > /proc/sys/net/ipv4/icmp_echo_ignore_broadcasts             # ignore echo broadcast requests to prevent smurf attacks
 echo 1 > /proc/sys/net/ipv4/ip_forward                              # enable ip forwarding
 
-# delete all existing rules
-$iptables -F
-$iptables -X
+# reset lai cac rule hien tai cua iptables
+$iptables -F # xoa chuoi dc chon hoac tung chuoi 1 trong bang neu k co chuoi nao duoc khai bao
+$iptables -X 
+# -X co 2 chuc nang chinh: Xoa moi chuoi duoc dinh nghia cua user, hoac neu k co tham so thi no se co gang xoa moi chuoi k co trong bang hien tai
 $iptables -t nat -F
 $iptables -t nat -X
+# Xoa bang NAT. Xem them phan giai thich ve bang NAT trong bao cao hoac README.md
 $iptables -t mangle -F
 $iptables -t mangle -X
 
@@ -115,7 +115,9 @@ if [ "$whitelist_allow" = "1" ]; then
 	$iptables -N acceptlist
 	good_ips=$(egrep -v -E "^#|^$" $white_list)
 	for ip in $good_ips; do
+		$iptables -A acceptlist -s $ip -j LOG --log-prefix "Allow packet came from :"
 		$iptables -A acceptlist -s $ip -j ACCEPT
+
 	done
 	# insert or append our acceptlist
 	$iptables -I INPUT -j acceptlist
@@ -167,13 +169,33 @@ $iptables -A INPUT -p tcp --tcp-flags ALL ALL -j DROP # Drop incoming malformed 
 $iptables -A INPUT -p tcp --tcp-flags ALL NONE -j DROP # Drop all NULL packets
 $iptables -A INPUT -p tcp ! --syn -m state --state NEW -j DROP # Drop all new connection are not SYN packets
 
+########################################################################
+# Chong lai steath scan - steath scan attack measures -nmap
+
+$iptables -N STEALTH_SCAN # Tao moi chain "STEAlTH_SCAN" - make a chain
+$iptables -A STEALTH_SCAN -j LOG --log-prefix "stealth_scan_attack: "
+$iptables -A STEALTH_SCAN -j DROP
+# Chuyen qua chain "STEALTH_SCAN" cho nhung packet da duoc stealth scan
+# Jump to the "STEALTH_SCAN" chain for stealth scanned packets
+$iptables -A INPUT -p tcp --tcp-flags SYN,ACK SYN,ACK -m state --state NEW -j STEALTH_SCAN
+
+$iptables -A INPUT -p tcp --tcp-flags SYN,FIN SYN,FIN         -j STEALTH_SCAN
+$iptables -A INPUT -p tcp --tcp-flags SYN,RST SYN,RST         -j STEALTH_SCAN
+$iptables -A INPUT -p tcp --tcp-flags ALL SYN,RST,ACK,FIN,URG -j STEALTH_SCAN
+
+$iptables -A INPUT -p tcp --tcp-flags FIN,RST FIN,RST -j STEALTH_SCAN
+$iptables -A INPUT -p tcp --tcp-flags ACK,FIN FIN     -j STEALTH_SCAN
+$iptables -A INPUT -p tcp --tcp-flags ACK,PSH PSH     -j STEALTH_SCAN
+$iptables -A INPUT -p tcp --tcp-flags ACK,URG URG     -j STEALTH_SCAN
+#########################################################################
+
 # ping flood projection 5 per second
 $iptables -A INPUT -p icmp -m limit --limit 5/s -j ACCEPT
 $iptables -A OUTPUT -p icmp -m limit --limit 5/s -j ACCEPT
 $iptables -A INPUT -p icmp -j DROP
 $iptables -A OUTPUT -p icmp -j DROP
 
-# log all the rest before dropping
+# Log lai tat ca truoc khi drop
 $iptables -A INPUT   -j LOG --log-prefix "IN: "
 $iptables -A INPUT   -j DROP
 $iptables -A OUTPUT  -j LOG --log-prefix "OU: "

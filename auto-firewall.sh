@@ -67,6 +67,7 @@ $iptables -t nat -X
 # Xoa bang NAT. Xem them phan giai thich ve bang NAT trong bao cao hoac README.md
 $iptables -t mangle -F
 $iptables -t mangle -X
+# tuong tu voi bang mangle
 
 # default policy
 if [ "$stop_firewall" = "0" ]; then
@@ -194,6 +195,27 @@ $iptables -A INPUT -p icmp -m limit --limit 5/s -j ACCEPT
 $iptables -A OUTPUT -p icmp -m limit --limit 5/s -j ACCEPT
 $iptables -A INPUT -p icmp -j DROP
 $iptables -A OUTPUT -p icmp -j DROP
+
+# Chong lai HTTP/Dos - DDos
+# Counter HTTP/Dos - DDos
+$iptables -N HTTP_DOS # Make chain with the name "HTTP_DOS"
+$iptables -A HTTP_DOS -p tcp -m multiport --dports $HTTP \
+         -m hashlimit \
+         --hashlimit 1/s \
+         --hashlimit-burst 100 \
+         --hashlimit-htable-expire 300000 \
+         --hashlimit-mode srcip \
+         --hashlimit-name t_HTTP_DOS \
+         -j RETURN
+
+# Huy ket noi vuot qua gioi han
+# Discard connection exceeding limit
+$iptables -A HTTP_DOS -j LOG --log-prefix "http_dos_attack: "
+$iptables -A HTTP_DOS -j DROP
+
+# Nhay den chain HTTP_DOS
+# Packets to HTTP jump to "HTTP_DOS" chain
+$iptables -A INPUT -p tcp -m multiport --dports $incoming_tcp -j HTTP_DOS
 
 # Log lai tat ca truoc khi drop
 $iptables -A INPUT   -j LOG --log-prefix "IN: "

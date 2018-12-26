@@ -10,13 +10,14 @@ lan_allow="1" # Chap nhan moi connection tu LAN
 blacklist_block="1" # Block moi ip trong file blacklist
 whitelist_allow="1" # Allow moi ip trong file whitelist
 
-
 # Cac cong ra vao cua UDP va TCP, ket noi SSH la bat buoc nen khong can khai bao o day
 # ------------------------------------------------------------------------------------
 incoming_tcp="80,443"            # allow incoming tcp request
 incoming_udp=""                  # allow incoming udp request
 outgoing_tcp="22,53,80,443"      # allow outgoing tcp request
 outgoing_udp="53,123"            # allow outgoing udp request
+HTTP="80,443"
+OK_ICMP="0 3 4 8 11"
 # ------------------------------------------------------------------------------------
 
 # file
@@ -34,7 +35,7 @@ case "$1" in
 		stop_firewall="1"
         ;;
     *) 
-        echo $"Chay day du cau lenh: filewall.sh {start|stop}"
+        echo "Chay day du cau lenh: filewall.sh {start|stop}"
         exit 2
 esac
 
@@ -74,11 +75,12 @@ if [ "$stop_firewall" = "0" ]; then
 	$iptables -P INPUT   DROP
 	$iptables -P FORWARD DROP
 	$iptables -P OUTPUT  DROP
+	echo "done"
 elif [ "$stop_firewall" = "1" ]; then
 	$iptables -P INPUT   ACCEPT
 	$iptables -P FORWARD ACCEPT
 	$iptables -P OUTPUT  ACCEPT
-	echo "OK."
+	echo "done"
 	exit 0
 fi
 
@@ -131,7 +133,9 @@ if [ "$blacklist_block" = "1" ]; then
 	$iptables -N droplist
 	bad_ips=$(egrep -v -E "^#|^$" $black_list)
 	for ip in $bad_ips; do
-		$iptables -A droplist -s $ip -j LOG --log-prefix "Drop ip in blacklist"
+		$iptables -A droplist -s $ip -j LOG --log-prefix "Drop ip in blacklist: "
+		echo -n "blacklists: "
+		echo $ip
 		$iptables -A droplist -s $ip -j DROP
 	done
 	# insert or append our droplist 
@@ -170,6 +174,16 @@ $iptables -A INPUT -p tcp --tcp-flags ALL ALL -j DROP # Drop incoming malformed 
 $iptables -A INPUT -p tcp --tcp-flags ALL NONE -j DROP # Drop all NULL packets
 $iptables -A INPUT -p tcp ! --syn -m state --state NEW -j DROP # Drop all new connection are not SYN packets
 
+# drop LAN subnet
+$iptables -t mangle -A PREROUTING -s 224.0.0.0/3 -j DROP 
+$iptables -t mangle -A PREROUTING -s 169.254.0.0/16 -j DROP 
+$iptables -t mangle -A PREROUTING -s 172.16.0.0/12 -j DROP 
+$iptables -t mangle -A PREROUTING -s 192.0.2.0/24 -j DROP 
+$iptables -t mangle -A PREROUTING -s 192.168.0.0/16 -j DROP 
+$iptables -t mangle -A PREROUTING -s 10.0.0.0/8 -j DROP 
+$iptables -t mangle -A PREROUTING -s 0.0.0.0/8 -j DROP 
+$iptables -t mangle -A PREROUTING -s 240.0.0.0/5 -j DROP 
+$iptables -t mangle -A PREROUTING -s 127.0.0.0/8 ! -i lo -j DROP
 ########################################################################
 # Chong lai steath scan - steath scan attack measures -nmap
 
@@ -191,6 +205,11 @@ $iptables -A INPUT -p tcp --tcp-flags ACK,URG URG     -j STEALTH_SCAN
 #########################################################################
 
 # ping flood projection 5 per second
+for item in $OK_ICMP; do
+$iptables -A INPUT -i $ext_if -s $network_addr -p icmp --icmp-type $item -j ACCEPT
+$iptables -A OUTPUT -o $ext_if -s $network_addr -p icmp --icmp-type $item -j ACCEPT
+done
+
 $iptables -A INPUT -p icmp -m limit --limit 5/s -j ACCEPT
 $iptables -A OUTPUT -p icmp -m limit --limit 5/s -j ACCEPT
 $iptables -A INPUT -p icmp -j DROP
@@ -211,6 +230,7 @@ $iptables -A HTTP_DOS -p tcp -m multiport --dports $HTTP \
 # Huy ket noi vuot qua gioi han
 # Discard connection exceeding limit
 $iptables -A HTTP_DOS -j LOG --log-prefix "http_dos_attack: "
+echo "DDoS incomminggg"
 $iptables -A HTTP_DOS -j DROP
 
 # Nhay den chain HTTP_DOS
@@ -226,4 +246,4 @@ $iptables -A FORWARD -j LOG --log-prefix "FW: "
 $iptables -A FORWARD -j DROP
 
 ### End
-echo "OK."
+echo "done"

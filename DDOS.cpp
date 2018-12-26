@@ -119,7 +119,7 @@ int main (void)
 
 	sin.sin_port = htons(80);
 
-	sin.sin_addr.s_addr = inet_addr ("192.168.2.3");
+	sin.sin_addr.s_addr = inet_addr("192.168.2.3");
 
 	
 
